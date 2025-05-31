@@ -8,7 +8,7 @@
       "id": 2,
       "title": "hi"
     },
-  "user": [
+  "users": [
     {
       "id": 1,
       "title": "khlee"
@@ -16,6 +16,15 @@
     {
       "id": 2,
       "title": "test"
+    },
+  "data": [
+    {
+      "id": 1,
+      "title": "data1"
+    },
+    {
+      "id": 2,
+      "title": "data2"
     },
   ],
   "profile": {
