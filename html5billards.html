@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>HTML5 당구 게임 (Billiards)</title>
+    <style>
+        /* 캔버스 가운데 정렬 및 기본 스타일 */
+        body { 
+            margin: 0; 
+            background-color: #f0f0f0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            font-family: Arial, sans-serif;
+            flex-direction: column;
+        }
+        #gameCanvas { 
+            border: 15px solid #5d4037; /* 테이블 테두리 */
+            background-color: #006600; /* 테이블 펠트 색상 */
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            cursor: pointer; /* 클릭 가능한 모양 */
+        }
+        .instructions {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #333;
+        }
+        meter {
+          width: 600px;
+          height: 50px;
+          color: "red";
+        }
+        .disp {
+          display: flex;
+          align-items : center;
+          justify-content: space-around;
+        }
+    </style>
+</head>
+<body>
+    <div class="disp"><div>power : &nbsp; </div><div><meter value="10" min="0" max="30"></meter></div><div>&nbsp;  점 수 : &nbsp;</div><div id="score">0</div></div>
+    <div><canvas id="gameCanvas" width="800" height="400"></canvas></div>
+    <div class="instructions">
+        **사용 방법:** 마우스로 흰 공 뒤쪽을 클릭하고 드래그하여 놓으면, 그 방향과 거리에 비례하여 흰 공이 발사됩니다.
+    </div>
+
+    <script>
+        // --- 1. 초기 설정 및 변수 선언 ---
+        const body = document.querySelector('body');
+        const meter = document.querySelector('meter');
+        const scorep = document.querySelector('#score');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const audio = new Audio('collision.mp3');
+
+
+        const TABLE_WIDTH = canvas.width;
+        const TABLE_HEIGHT = canvas.height;
+        const BALL_RADIUS = 14;
+        const FRICTION = 0.993; // 마찰 계수
+        const MAX_SPEED = 30; // 최대 발사 속도
+        
+        let balls = [];
+        let hit = [0,0,0,0];
+        
+        mx = 0;
+        my = 0;
+        started = false;
+        fired = false;
+        score = 0;
+
+        // --- 2. 공 객체 정의 및 초기화 ---
+        function createBall(id, x, y, color) {
+            return {
+                id: id,
+//                x: x,
+//                y: y,
+                x: TABLE_HEIGHT * Math.random(),
+                y: TABLE_WIDTH * Math.random(),
+                vx: 0, // x축 속도
+                vy: 0, // y축 속도
+                path: [],
+                radius: BALL_RADIUS,
+                color: color,
+                draw: function() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                    ctx.closePath();
+
+                    if ( this.color == "white" && this.vx == 0 && started ) {
+                      ctx.beginPath();
+                      ctx.moveTo(this.x,this.y);
+                      ctx.lineTo(this.x+10*(this.x-mx),this.y+10*(this.y-my));
+                      ctx.strokeStyle = "white";
+                      ctx.stroke();
+                    }
+                    if ( this.color == "white" && (this.vx != 0 || !started) ) {
+                      ctx.strokeStyle = "white";
+                      ctx.lineWidth = 0.5;
+                      for ( let i=0 ; i<this.path.length ; i++ ) {
+                        ctx.beginPath();
+                        ctx.moveTo(this.path[i][0],this.path[i][1]);
+                        ctx.lineTo(this.path[i][2],this.path[i][3]);
+                        ctx.stroke();
+                      }
+                      ctx.beginPath();
+                      ctx.moveTo(this.startx,this.starty);
+                      ctx.lineTo(this.x,this.y);
+                      ctx.stroke();
+                    }
+
+
+                }
+            };
+        }
+
+        // 초기 공 배치 (4구 기준 흰 공, 빨간 공 2개)
+        const cueBall = createBall(0, 150, TABLE_HEIGHT / 2, 'white');
+        const yellowBall = createBall(1, 50, TABLE_HEIGHT / 3, 'yellow');
+        const targetBall1 = createBall(2, TABLE_WIDTH - 150, TABLE_HEIGHT / 4, 'red');
+        const targetBall2 = createBall(3, TABLE_WIDTH - 50, TABLE_HEIGHT * 3 / 4, 'red');
+        balls.push(cueBall, yellowBall, targetBall1, targetBall2);
+        
+        // --- 3. 충돌 처리 함수 (핵심 물리 엔진) ---
+
+        // 두 공의 충돌 후 속도를 계산하는 함수 (탄성 충돌)
+        function resolveCollision(ball1, ball2) {
+            const dx = ball2.x - ball1.x;
+            const dy = ball2.y - ball1.y;
+
+            let ball = null;
+            if ( ball1.color == 'white' )
+              ball = ball1;
+            if ( ball2.color == 'white' )
+              ball = ball2;
+            if ( ball != null ) {
+              ball.path.push([ball.startx,ball.starty,ball.x,ball.y]);
+              ball.startx = ball.x;
+              ball.starty = ball.y;
+            }
+
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const minDistance = ball1.radius + ball2.radius;
+
+            if (distance < minDistance) {
+                audio.play();
+                if ( ball1.id == 0 ) hit[ball2.id] = 1;
+                if ( ball2.id == 0 )hit[ball1.id] = 1;
+                // 겹침 정도 및 위치 보정
+                const overlap = minDistance - distance;
+                const nx = dx / distance; // 단위 법선 벡터 x
+                const ny = dy / distance; // 단위 법선 벡터 y
+
+                // 위치 보정: 두 공을 살짝 밀어냅니다.
+                ball1.x -= overlap / 2 * nx;
+                ball1.y -= overlap / 2 * ny;
+                ball2.x += overlap / 2 * nx;
+                ball2.y += overlap / 2 * ny;
+
+                // 상대 속도 및 법선 축 투영
+                const dvx = ball2.vx - ball1.vx;
+                const dvy = ball2.vy - ball1.vy;
+                const vn = dvx * nx + dvy * ny; // 법선 축에 투영된 상대 속도
+
+                // 이미 멀어지고 있는 경우 무시
+                if (vn >= 0) {
+                    return;
+                }
+
+                // 충돌 임펄스 계산 (질량이 같다고 가정)
+                const impulse = 1.5 * vn;
+
+                // 속도 업데이트: 법선 벡터 방향으로 속도 교환
+                ball1.vx += 0.7 * impulse * nx;
+                ball1.vy += 0.7 * impulse * ny;
+                ball2.vx -= .3 * impulse * nx;
+                ball2.vy -= .3 * impulse * ny;
+            }
+        }
+
+        // 모든 공 쌍에 대해 충돌을 감지하고 처리
+        function collisionDetection() {
+            for (let i = 0; i < balls.length; i++) {
+                for (let j = i + 1; j < balls.length; j++) {
+                    resolveCollision(balls[i], balls[j]);
+                }
+            }
+        }
+        
+        // --- 4. 게임 루프 로직 ---
+
+        function update() {
+            for (let i = 0; i < balls.length; i++) {
+                const ball = balls[i];
+
+                // 1. 위치 업데이트
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+
+                // 2. 마찰 적용
+                ball.vx *= FRICTION;
+                ball.vy *= FRICTION;
+
+                // 3. 정지 조건
+                if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
+                    ball.vx = 0;
+                    ball.vy = 0;
+                    ball.startx = ball.x;
+                    ball.starty = ball.y;
+                    if ( i==0 && fired ) {
+                      fired = false;
+                      ball.path.push([ball.startx,ball.starty,ball.x,ball.y]);
+                      console.log("stoped");
+                      update_score();
+                    }
+                }
+
+                // 4. 벽과의 충돌 처리 (반사)
+                // x축 충돌
+                if (ball.x + ball.radius > TABLE_WIDTH || ball.x - ball.radius < 0) {
+                    ball.vx = -ball.vx;
+                    // 위치 보정
+                    if (ball.x + ball.radius > TABLE_WIDTH) ball.x = TABLE_WIDTH - ball.radius;
+                    if (ball.x - ball.radius < 0) ball.x = ball.radius;
+                    if ( i == 0 ) {
+                      ball.path.push([ball.startx,ball.starty,ball.x,ball.y]);
+                      ball.startx = ball.x;
+                      ball.starty = ball.y;
+                    }
+                }
+                // y축 충돌
+                if (ball.y + ball.radius > TABLE_HEIGHT || ball.y - ball.radius < 0) {
+                    ball.vy = -ball.vy;
+                    // 위치 보정
+                    if (ball.y + ball.radius > TABLE_HEIGHT) ball.y = TABLE_HEIGHT - ball.radius;
+                    if (ball.y - ball.radius < 0) ball.y = ball.radius;
+                    if ( i == 0 ) {
+                      ball.path.push([ball.startx,ball.starty,ball.x,ball.y]);
+                      ball.startx = ball.x;
+                      ball.starty = ball.y;
+                    }
+                }
+            }
+            
+            // 5. 공-공 충돌 처리 실행
+            collisionDetection();
+        }
+
+        function update_score() {
+          if ( hit[1]==1 ) {
+              if ( score > 0 )
+                score--;
+          } else if ( hit[2]==1 && hit[3]==1 ) {
+              score++;
+          }
+          console.log(score);
+          scorep.innerHTML = score;
+        }
+
+        function draw() {
+            // 캔버스 초기화
+            ctx.clearRect(0, 0, TABLE_WIDTH, TABLE_HEIGHT);
+
+            // 모든 공 그리기
+            balls.forEach(ball => ball.draw());
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop); // 다음 프레임 요청
+        }
+
+        // --- 5. 사용자 입력 (큐 조작) ---
+        body.addEventListener('click', (event) => {
+            if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
+            started = false;
+            fired = true;
+            
+            // 캔버스 내의 마우스 좌표 계산
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // 흰 공 위치와 클릭 위치 사이의 벡터 계산
+            const dx = cueBall.x - mouseX;
+            const dy = cueBall.y - mouseY;
+
+            // 힘의 크기 (거리)
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 속도 계산 및 제한
+            const speed = Math.min(distance * 0.15, MAX_SPEED); // 0.15는 힘 계수
+
+            // 흰 공에 속도 적용 (벡터 방향 유지)
+            cueBall.vx = (dx / distance) * speed;
+            cueBall.vy = (dy / distance) * speed;
+            
+            hit = [0,0,0,0];
+            if ( cueBall.path.length > 0 )
+              cueBall.path = [];
+        });
+
+// 사용자 입력 (마우스 이동)
+body.addEventListener('mousemove', (event) => {
+    // 공이 움직이는 중이면 클릭 무시
+    if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
+
+    if ( !started && Math.abs(cueBall.vy) == 0 && Math.abs(cueBall.vy) == 0 ) {
+      started = true;
+      console.log("started");
+      if ( cueBall.path.length > 0 )
+        cueBall.path = [];
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    // 흰 공 위치와 클릭 위치 사이의 거리 및 각도 계산
+    const dx = clickX - cueBall.x;
+    const dy = clickY - cueBall.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // 속도 계산 및 제한
+    const speed = Math.min(distance * 0.15, MAX_SPEED); // 0.15는 힘 계수
+    meter.value = speed;
+
+    // 클릭 반대 방향으로 힘 적용 (클릭 지점으로부터 밀어내는 효과)
+    //whiteBall.vx = -dx * 0.3; 
+    //whiteBall.vy = -dy * 0.3;
+    
+    //mx = event.x;
+    //my = event.y;
+    mx = clickX;
+    my = clickY;
+
+});
+
+
+        // --- 게임 시작 ---
+        gameLoop();
+    </script>
+</body>
+</html>
