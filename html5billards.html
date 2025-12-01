@@ -28,7 +28,7 @@
             color: #333;
         }
         meter {
-          width: 400px;
+          width: 600px;
           height: 50px;
           color: "red";
         }
@@ -41,7 +41,7 @@
 </head>
 <body>
     <div class="disp"><div>power : &nbsp; </div><div><meter value="10" min="0" max="30"></meter></div><div>&nbsp;  점 수 : &nbsp;</div><div id="score">0</div></div>
-    <div><canvas id="gameCanvas" width="600" height="300"></canvas></div>
+    <div><canvas id="gameCanvas" width="800" height="400"></canvas></div>
     <div class="instructions">
         **사용 방법:** 마우스로 흰 공 뒤쪽을 클릭하고 드래그하여 놓으면, 그 방향과 거리에 비례하여 흰 공이 발사됩니다.
     </div>
@@ -387,5 +387,6 @@ body.addEventListener('touchmove', (event) => {
 </body>
 
 </html>
+
 
 
