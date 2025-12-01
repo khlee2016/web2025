@@ -344,11 +344,48 @@ body.addEventListener('mousemove', (event) => {
 
 });
 
+// 사용자 입력 (마우스 이동)
+body.addEventListener('touchmove', (event) => {
+    event.preventDefault();
+    // 공이 움직이는 중이면 클릭 무시
+    if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
 
+    if ( !started && Math.abs(cueBall.vy) == 0 && Math.abs(cueBall.vy) == 0 ) {
+      started = true;
+      console.log("started");
+      if ( cueBall.path.length > 0 )
+        cueBall.path = [];
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    // 흰 공 위치와 클릭 위치 사이의 거리 및 각도 계산
+    const dx = clickX - cueBall.x;
+    const dy = clickY - cueBall.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // 속도 계산 및 제한
+    const speed = Math.min(distance * 0.15, MAX_SPEED); // 0.15는 힘 계수
+    meter.value = speed;
+
+    // 클릭 반대 방향으로 힘 적용 (클릭 지점으로부터 밀어내는 효과)
+    //whiteBall.vx = -dx * 0.3; 
+    //whiteBall.vy = -dy * 0.3;
+    
+    //mx = event.x;
+    //my = event.y;
+    mx = clickX;
+    my = clickY;
+
+});
+        
         // --- 게임 시작 ---
         gameLoop();
     </script>
 </body>
 
 </html>
+
 
