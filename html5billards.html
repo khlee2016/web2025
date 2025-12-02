@@ -321,8 +321,8 @@ body.addEventListener('mousemove', (event) => {
     }
 
     const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+    const clickX = event.touches[0].clientX - rect.left;
+    const clickY = event.touches[0].clientY - rect.top;
 
     // 흰 공 위치와 클릭 위치 사이의 거리 및 각도 계산
     const dx = clickX - cueBall.x;
@@ -387,6 +387,7 @@ body.addEventListener('touchmove', (event) => {
 </body>
 
 </html>
+
 
 
 
