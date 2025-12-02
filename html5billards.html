@@ -387,8 +387,8 @@ body.addEventListener('touchend', (event) => {
     // 공이 움직이는 중이면 클릭 무시
     if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
 
-    const cevent = new Event('click');
-    body.dispatchEvent(cevent);
+    event.type = 'click';
+    body.dispatchEvent(event);
 
 });
         
@@ -398,6 +398,7 @@ body.addEventListener('touchend', (event) => {
 </body>
 
 </html>
+
 
 
 
