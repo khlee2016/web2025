@@ -380,6 +380,17 @@ body.addEventListener('touchmove', (event) => {
     my = clickY;
 
 });
+
+// 사용자 입력 (마우스 이동)
+body.addEventListener('touchend', (event) => {
+    event.preventDefault();
+    // 공이 움직이는 중이면 클릭 무시
+    if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
+
+    const cevent = new Event('click');
+    body.dispatchEvent(cevent);
+
+});
         
         // --- 게임 시작 ---
         gameLoop();
@@ -387,6 +398,7 @@ body.addEventListener('touchmove', (event) => {
 </body>
 
 </html>
+
 
 
 
