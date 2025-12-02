@@ -383,13 +383,32 @@ body.addEventListener('touchmove', (event) => {
 
 // 사용자 입력 (마우스 이동)
 body.addEventListener('touchend', (event) => {
-    event.preventDefault();
-    // 공이 움직이는 중이면 클릭 무시
-    if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
+            if (balls.some(ball => ball.vx !== 0 || ball.vy !== 0)) return;
+            started = false;
+            fired = true;
+            
+            // 캔버스 내의 마우스 좌표 계산
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
 
-    event.type = 'click';
-    body.dispatchEvent(event);
+            // 흰 공 위치와 클릭 위치 사이의 벡터 계산
+            const dx = cueBall.x - mouseX;
+            const dy = cueBall.y - mouseY;
 
+            // 힘의 크기 (거리)
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 속도 계산 및 제한
+            const speed = Math.min(distance * 0.15, MAX_SPEED); // 0.15는 힘 계수
+
+            // 흰 공에 속도 적용 (벡터 방향 유지)
+            cueBall.vx = (dx / distance) * speed;
+            cueBall.vy = (dy / distance) * speed;
+            
+            hit = [0,0,0,0];
+            if ( cueBall.path.length > 0 )
+              cueBall.path = [];
 });
         
         // --- 게임 시작 ---
@@ -398,6 +417,7 @@ body.addEventListener('touchend', (event) => {
 </body>
 
 </html>
+
 
 
 
